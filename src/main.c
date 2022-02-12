@@ -5,6 +5,7 @@
 #define LOST 2
 #define BANNED 0
 #define EXPDATE 20240715
+#define FIRSTCARDNUMBER 312346
 
 typedef struct card {
     long studentNum;
@@ -24,6 +25,8 @@ typedef struct student {
 
 Student* front = NULL;
 Student* rear = NULL;
+int cardSum = 0;
+int studentSum = 0;
 
 //将余额转化为float格式，便于输出
 float balanceToFloat(int balance) {
@@ -67,7 +70,24 @@ Card* initCard(long studentNum, int status, float balance,int expDate, int pwd) 
     return card;
 }
 
+int getValidDigit(long num) {
+    int sum = 0;
+    while(num != 0) {
+        sum += num % 10;
+        num /= 10;
+    }
+    return 9 - (sum % 10);
+}
+
+int cardNumberFactory() {
+    int currentCardNum = FIRSTCARDNUMBER + cardSum;
+    cardSum++;
+    int validDigit = getValidDigit(currentCardNum);
+    return currentCardNum * 10 + validDigit;
+}
+
 int main() {
-    initCard(123, NORMAL, 100.12, EXPDATE, 8888);
+    // int abc = cardNumberFactory();
+    // initCard(123, NORMAL, 100.12, EXPDATE, 8888);
     return 0;
 }
