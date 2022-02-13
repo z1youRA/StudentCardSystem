@@ -46,13 +46,9 @@ void initStatus() {
     }
 }
 
-//将余额转化为float格式，便于输出
-float balanceToFloat(int balance) {
-    float flBalance = balance / 100.0;
-    return flBalance;
+int balanceToInt(float balance) {
+    return (int)(balance * 100);
 }
-
-//将指向初始化后
 
 //初始化学生结构，返回指向该学生的指针
 Student* initStu(char* name, long studentNum) {
@@ -136,14 +132,19 @@ Student* getStudent(long studentNum) {
 }
 
 //手动开户操作
-int openDiscount() {
-    char name[20];
-    long studentNum;
+int openDiscount(char* name, long studentNum) {
+    // char name[20];
+    // long studentNum;
     Student* temp;
+   
+    /*
+    #TODO 测试用，暂停键盘输入，改为直接读入数据
     printf("Input name: ");
     scanf("%s", name);
     printf("\nInput student ID: ");
     scanf("%ld", &studentNum);
+    */
+   
     Student* target = getStudent(studentNum); //学生在学生数组中的位置指针
     //#TODO 检查输入学号年份和专业是否存在
     if(target->status == DELETED || target->status == NORMAL) {
@@ -195,13 +196,52 @@ int openCard(long studentNum) {
     }
 }
 
+int transInt(float fl) {
+    return (int)(fl * 100);
+}
+
+//向学号指定的账户充值，充值成功返回OK，失败返回FAILED
+int topupBalance(long studentNum, float topupAmout) {
+    Student* stu = getStudent(studentNum);
+    int temp = balanceToInt(topupAmout);
+    if(stu->status == NORMAL) {
+        if(stu->rear == NULL) {
+            printf("该学生无卡，请先开卡！");
+            return FAILED;
+        }
+        else if(stu->rear->status == NORMAL) {
+            if(temp <= 0) {
+                printf("充值金额需大于0, 充值失败！");
+                return FAILED;
+            }
+            if((temp + stu->rear->balance) >= 100000) { //充值后金额大于1000元
+                printf("卡内余额需小于1000元， 充值失败！");
+                return FAILED;
+            }
+            stu->rear->balance += temp;
+            printf("充值成功！");
+            return OK;
+        }
+        else {
+            printf("该学生卡已被挂失或禁用，充值失败！");
+            return FAILED;
+        }
+    }
+    else {
+        printf("账户被注销或不存在，充值失败！");
+        return FAILED;
+    }
+}
+
 int main() {
     // int abc = cardNumberFactory();
     // initCard(123, NORMAL, 100.12, EXPDATE, 8888);
     initStatus();
-    openDiscount();
-    openDiscount();
+    openDiscount("a", 2020010011);
+    openDiscount("b", 2020010021);
     openCard(2020010011);
     openCard(2020010021);
+    topupBalance(2020010011, 100);
+    topupBalance(2020010011, 10000);
     return 0;
 }
