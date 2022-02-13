@@ -279,6 +279,51 @@ int cancelLoss(long studentNum) {
     }
 }
 
+int deleteAccount(long studentNum) {
+    Student *stu = getStudent(studentNum);
+    if(stu->status == NORMAL) {
+        stu->status = DELETED;
+        printf("账户注销成功！");
+    }
+    else {
+        printf("ERROR: 账户不可用，注销失败！\n");
+        return FAILED;
+    }
+}
+
+//食堂支付
+int pay(long studentNum, float payAmount) {
+    Student* stu = getStudent(studentNum);
+    int temp = balanceToInt(payAmount);
+    if(stu->status == NORMAL) {
+        if(stu->rear == NULL) {
+            printf("该学生无卡，请先开卡！\n");
+            return FAILED;
+        }
+        else if(stu->rear->status == NORMAL) {
+            if(temp <= 0) {
+                printf("支付金额需大于0, 支付失败！\n");
+                return FAILED;
+            }
+            if((stu->rear->balance - payAmount) < 0) { //余额足够支付
+                printf("卡内余额不足，支付失败！\n");
+                return FAILED;
+            }
+            stu->rear->balance -= temp;
+            printf("支付成功！\n");
+            return OK;
+        }
+        else {
+            printf("该学生卡已被挂失或禁用，支付失败！\n");
+            return FAILED;
+        }
+    }
+    else {
+        printf("账户被注销或不存在，支付失败！\n");
+        return FAILED;
+    }
+}
+
 int main() {
     // int abc = cardNumberFactory();
     // initCard(123, NORMAL, 100.12, EXPDATE, 8888);
