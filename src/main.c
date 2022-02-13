@@ -165,26 +165,32 @@ int openDiscount() {
 //为指定学生开卡
 int openCard(long studentNum) {
     Student* stu = getStudent(studentNum);
-    Card* card = initCard(studentNum, NORMAL, 0, EXPDATE, 8888); //默认密码8888
-    if(stu->rear == NULL) { //该学生卡片数量为0
-        stu->front = card;
-        stu->rear = card;
-        card->next = NULL;
+    if(stu->status == NORMAL) {
+        Card* card = initCard(studentNum, NORMAL, 0, EXPDATE, 8888); //默认密码8888
+        if(stu->rear == NULL) { //该学生卡片数量为0
+            stu->front = card;
+            stu->rear = card;
+            card->next = NULL;
+        }
+        else if(stu->rear->status == LOST){
+            stu->rear->status = BANNED;
+            stu->rear->next = card;
+            card->balance = stu->rear->balance; //将上张卡余额转入本张卡， 上张卡balance清零
+            stu->rear->balance = 0;
+            stu->rear = card;
+            card->next = NULL;
+        }
+        else if(stu->rear->status == BANNED) {
+            printf("ERROR: 上张卡被禁用，开卡失败！");
+            exit(FAILED);
+        }
+        else { // 上张卡正常使用，未挂失
+            printf("卡未挂失，请先挂失后开卡！");
+            return FAILED;
+        }
     }
-    else if(stu->rear->status == LOST){
-        stu->rear->status = BANNED;
-        stu->rear->next = card;
-        card->balance = stu->rear->balance; //将上张卡余额转入本张卡， 上张卡balance清零
-        stu->rear->balance = 0;
-        stu->rear = card;
-        card->next = NULL;
-    }
-    else if(stu->rear->status == BANNED) {
-        printf("ERROR: 上张卡被禁用，开卡失败！");
-        exit(FAILED);
-    }
-    else { // 上张卡正常使用，未挂失
-        printf("卡未挂失，请先挂失后开卡！");
+    else {
+        printf("ERROR: 账户不可用，开卡失败！");
         return FAILED;
     }
 }
@@ -196,5 +202,6 @@ int main() {
     openDiscount();
     openDiscount();
     openCard(2020010011);
+    openCard(2020010021);
     return 0;
 }
