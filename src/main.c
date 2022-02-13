@@ -15,11 +15,13 @@
 
 typedef struct card {
     long studentNum;
+    int cardNum;
     int status;
     int balance;
     int expDate;
     int pwd;
     struct card* next;
+    struct card* down;
     //#TODO类似十字链表，在窗口和卡片处均存储log
 } Card;
 
@@ -31,11 +33,10 @@ typedef struct student {
     int status;
 } Student;
 
-Student* front = NULL;
-Student* rear = NULL;
 int cardSum = 0;
 int studentSum = 0;
 Student students[MAJORNUM][STUDENTPERMAJOR];//#TODO数组可直接存放指向Student的指针，以减小数组大小
+Card* top = NULL; //卡链表
 int studentsPerMajor[MAJORNUM];
 //所有学生状态初始化为不存在
 void initStatus() {
@@ -78,7 +79,16 @@ Card* initCard(long studentNum, int status, float balance,int expDate, int pwd) 
         printf("动态空间申请失败!\n");
         exit(1);
     } 
+    if(top == NULL) { //卡链表为空
+        top = card;
+        top->down = NULL;
+    }
+    else {
+        card->down = top;   //单向链表，新生成的卡片放在表头
+        top = card;
+    }
     int abc = (int)(balance * 100);
+    card->cardNum = cardNumberFactory();
     card->balance = abc;
     card->expDate = expDate;
     card->status = status;
@@ -116,6 +126,18 @@ int getMajorFromId(long studentNum) {
 
 int getIndexFromId(long studentNum) {
     return studentNum / 10 % 1000;
+}
+
+//通过卡号查找对应卡并返回其指针，若查找失败返回NULL
+Card* getCard(int cardNum) {
+    Card* p = top;
+    while(p) {
+        if(p->cardNum == cardNum) {
+            return p;
+        }
+        p = p->down;
+    }
+    return NULL;
 }
 
 //通过学号索引对应学生并返回其指针， 若学号超出范围exit
@@ -194,10 +216,6 @@ int openCard(long studentNum) {
         printf("ERROR: 账户不可用，开卡失败！\n");
         return FAILED;
     }
-}
-
-int transInt(float fl) {
-    return (int)(fl * 100);
 }
 
 //向学号指定的账户充值，充值成功返回OK，失败返回FAILED
@@ -292,35 +310,30 @@ int deleteAccount(long studentNum) {
 }
 
 //食堂支付
-int pay(long studentNum, float payAmount) {
-    Student* stu = getStudent(studentNum);
-    int temp = balanceToInt(payAmount);
-    if(stu->status == NORMAL) {
-        if(stu->rear == NULL) {
-            printf("该学生无卡，请先开卡！\n");
-            return FAILED;
-        }
-        else if(stu->rear->status == NORMAL) {
-            if(temp <= 0) {
-                printf("支付金额需大于0, 支付失败！\n");
+int pay(int cardNum, float payAmount) {
+    Card* card = getCard(cardNum);
+    Student* stu = getStudent(card->studentNum);
+    int payInt = balanceToInt(payAmount);
+    if(stu->status == NORMAL) { //学生账户状态正常
+        if(card->status == NORMAL) { //卡状态正常
+            if(card->balance - payInt >= 0) { //卡中余额充足
+                card->balance -= payInt;
+                printf("支付成功！");
+                return OK;
+            }
+            else {
+                printf("卡中余额不足，支付失败!\n");
                 return FAILED;
             }
-            if((stu->rear->balance - payAmount) < 0) { //余额足够支付
-                printf("卡内余额不足，支付失败！\n");
-                return FAILED;
-            }
-            stu->rear->balance -= temp;
-            printf("支付成功！\n");
-            return OK;
         }
         else {
-            printf("该学生卡已被挂失或禁用，支付失败！\n");
+            printf("卡已挂失或禁用，支付失败！\n");
             return FAILED;
         }
     }
     else {
-        printf("账户被注销或不存在，支付失败！\n");
-        return FAILED;
+        printf("卡号对应学生账户不存在或已注销，支付失败!\n");
+        return FAILED; 
     }
 }
 
