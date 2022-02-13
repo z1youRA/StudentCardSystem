@@ -4,7 +4,7 @@
 #define NORMAL 1
 #define NONEXIST 2 //账户不存在
 #define BANNED 0 //禁用
-#define LOST 2 //挂失
+#define LOSS 2 //挂失
 #define EXPDATE 20240715 //过期时间
 #define FIRSTCARDNUMBER 312346 //第一张卡卡号
 #define MAJORNUM 100
@@ -118,7 +118,7 @@ int getIndexFromId(long studentNum) {
     return studentNum / 10 % 1000;
 }
 
-//通过学号索引对应学生并返回其指针， 若学号超出范围束调用
+//通过学号索引对应学生并返回其指针， 若学号超出范围exit
 Student* getStudent(long studentNum) {
     if(getMajorFromId(studentNum) < 0 || getMajorFromId(studentNum) >= MAJORNUM || getIndexFromId(studentNum) < 0 || getIndexFromId(studentNum) >= STUDENTPERMAJOR) {
         printf("ERROR: 学号超出范围！\n");
@@ -148,7 +148,7 @@ int openDiscount(char* name, long studentNum) {
     Student* target = getStudent(studentNum); //学生在学生数组中的位置指针
     //#TODO 检查输入学号年份和专业是否存在
     if(target->status == DELETED || target->status == NORMAL) {
-        printf("ERROR: 该学号已开户！");
+        printf("ERROR: 该学号已开户！\n");
         exit(FAILED);
     }
     // for(int i = 0; students[getMajorFromId(studentNum)][i].status != NONEXIST && i < STUDENTPERMAJOR; i++) {
@@ -173,7 +173,7 @@ int openCard(long studentNum) {
             stu->rear = card;
             card->next = NULL;
         }
-        else if(stu->rear->status == LOST){
+        else if(stu->rear->status == LOSS){
             stu->rear->status = BANNED;
             stu->rear->next = card;
             card->balance = stu->rear->balance; //将上张卡余额转入本张卡， 上张卡balance清零
@@ -182,16 +182,16 @@ int openCard(long studentNum) {
             card->next = NULL;
         }
         else if(stu->rear->status == BANNED) {
-            printf("ERROR: 上张卡被禁用，开卡失败！");
+            printf("ERROR: 上张卡被禁用，开卡失败！\n");
             exit(FAILED);
         }
         else { // 上张卡正常使用，未挂失
-            printf("卡未挂失，请先挂失后开卡！");
+            printf("卡未挂失，请先挂失后开卡！\n");
             return FAILED;
         }
     }
     else {
-        printf("ERROR: 账户不可用，开卡失败！");
+        printf("ERROR: 账户不可用，开卡失败！\n");
         return FAILED;
     }
 }
@@ -206,29 +206,75 @@ int topupBalance(long studentNum, float topupAmout) {
     int temp = balanceToInt(topupAmout);
     if(stu->status == NORMAL) {
         if(stu->rear == NULL) {
-            printf("该学生无卡，请先开卡！");
+            printf("该学生无卡，请先开卡！\n");
             return FAILED;
         }
         else if(stu->rear->status == NORMAL) {
             if(temp <= 0) {
-                printf("充值金额需大于0, 充值失败！");
+                printf("充值金额需大于0, 充值失败！\n");
                 return FAILED;
             }
             if((temp + stu->rear->balance) >= 100000) { //充值后金额大于1000元
-                printf("卡内余额需小于1000元， 充值失败！");
+                printf("卡内余额需小于1000元， 充值失败！\n");
                 return FAILED;
             }
             stu->rear->balance += temp;
-            printf("充值成功！");
+            printf("充值成功！\n");
             return OK;
         }
         else {
-            printf("该学生卡已被挂失或禁用，充值失败！");
+            printf("该学生卡已被挂失或禁用，充值失败！\n");
             return FAILED;
         }
     }
     else {
-        printf("账户被注销或不存在，充值失败！");
+        printf("账户被注销或不存在，充值失败！\n");
+        return FAILED;
+    }
+}
+
+int reportLoss(long studentNum) {
+    Student *stu = getStudent(studentNum);
+    if(stu->status == NORMAL) {
+        if(stu->rear == NULL) {
+            printf("该学生无卡，请先开卡！\n");
+            return FAILED;
+        }
+        else if(stu->rear->status == NORMAL) {
+            stu->rear->status = LOSS;
+            printf("挂失成功！\n");
+            return OK;
+        }
+        else {
+            printf("该学生卡已被挂失或禁用，挂失失败！\n");
+            return FAILED;
+        }
+    }
+    else {
+        printf("ERROR: 账户不可用，挂失失败！\n");
+        return FAILED;
+    }
+}
+
+int cancelLoss(long studentNum) {
+    Student *stu = getStudent(studentNum);
+    if(stu->status == NORMAL) {
+        if(stu->rear == NULL) {
+            printf("该学生无卡，请先开卡！\n");
+            return FAILED;
+        }
+        else if(stu->rear->status == LOSS) {
+            stu->rear->status = NORMAL;
+            printf("解挂成功！\n");
+            return OK;
+        }
+        else {
+            printf("该学生卡未挂失或已禁用，解挂失败！\n");
+            return FAILED;
+        }
+    }
+    else {
+        printf("ERROR: 账户不可用，解挂失败！\n");
         return FAILED;
     }
 }
