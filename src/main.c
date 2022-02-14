@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define DELETED 0 //销户
 #define NORMAL 1
 #define NONEXIST 2 //账户不存在
@@ -337,6 +338,35 @@ int pay(int cardNum, float payAmount) {
     }
 }
 
+int importOpenDisInfo() {
+    FILE* file = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/kh001.txt", "r"); //#TODO change to relative path
+    char* num = NULL;
+    char* name = NULL;
+    char* ptr;
+    long numLong = 0;
+    const char s[2] = ",";
+    if(file == NULL) {
+        printf("ERROR: 文件路径有误！");
+        exit(FAILED);
+    }
+    char str[30];
+    if(fgets(str, 30, file)) {
+        if(strcmp(str, "KH")) { //检测验证文件正确性
+            while(fgets(str, 30, file)) {   //逐行读入信息
+                num = strtok(str, s);
+                name = strtok(NULL, ";"); //从str中拆分出学号和姓名两部分
+                numLong = strtol(num, &ptr, 10); //str转换为long形式，便于存储
+                openDiscount(name, numLong);
+            }
+        }
+        else {
+            printf("file error");
+            exit(1);
+        }
+    }
+    fclose(file);
+}
+
 int main() {
     // int abc = cardNumberFactory();
     // initCard(123, NORMAL, 100.12, EXPDATE, 8888);
@@ -347,5 +377,6 @@ int main() {
     openCard(2020010021);
     topupBalance(2020010011, 100);
     topupBalance(2020010011, 10000);
+    importOpenDisInfo();
     return 0;
 }
