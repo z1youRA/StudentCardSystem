@@ -20,8 +20,9 @@
 #define CANCELLOSS 4
 #define TOPUP 5
 #define PAY 6
+#define TIMENOW 2021090309220510
 
-typedef struct {
+typedef struct card{
     long studentNum;
     int cardNum;
     int status;
@@ -33,17 +34,18 @@ typedef struct {
     //#TODO类似十字链表，在窗口和卡片处均存储log
 } Card;
 
-typedef struct {
+typedef struct opelog {
     int type;   //操作类型
     long studentNum;
     char name[20];
     int cardNum;
     int result; //操作结果
     int value;  //金额
-    OpeLog* next;
+    long time;
+    struct opelog * next;
 } OpeLog;
 
-typedef struct {
+typedef struct student{
     char name[20];
     long studentNum;
     Card* front;
@@ -53,11 +55,18 @@ typedef struct {
     OpeLog* tail;
 } Student;
 
+typedef struct window {
+    int index;
+    int logQuantity;
+    OpeLog* rear;
+} Window;
+
 int cardSum = 0;
 int studentSum = 0;
 Student students[MAJORNUM][STUDENTPERMAJOR];//#TODO数组可直接存放指向Student的指针，以减小数组大小
 Card* top = NULL; //卡链表
 int studentsPerMajor[MAJORNUM];
+Window windows[100];
 //所有学生状态初始化为不存在
 void initStatus() {
     for(int i = 0; i < MAJORNUM; i++) {
@@ -65,6 +74,41 @@ void initStatus() {
             students[i][j].status = NONEXIST;
         }
     }
+    for(int i = 0; i < 100; i++) {
+        windows[i].index = i + 1;
+        windows[i].rear = NULL;
+        windows[i].logQuantity = 0;
+    }
+}
+
+//用卡号计算出验证位并返回
+int getValidDigit(long num) {
+    int sum = 0;
+    while(num != 0) {
+        sum += num % 10;
+        num /= 10;
+    }
+    return 9 - (sum % 10);
+}
+
+//依次序输出卡号
+int cardNumberFactory() {
+    int currentCardNum = FIRSTCARDNUMBER + cardSum;
+    cardSum++;
+    int validDigit = getValidDigit(currentCardNum);
+    return currentCardNum * 10 + validDigit;
+}
+
+int getYearFromId(long studentNum) {
+    return studentNum / 1000000;
+}
+
+int getMajorFromId(long studentNum) {
+    return studentNum / 10000 % 100;
+}
+
+int getIndexFromId(long studentNum) {
+    return studentNum / 10 % 1000;
 }
 
 int balanceToInt(float balance) {
@@ -118,36 +162,6 @@ Card* initCard(long studentNum, int status, float balance,int expDate, int pwd) 
     return card;
 }
 
-//用卡号计算出验证位并返回
-int getValidDigit(long num) {
-    int sum = 0;
-    while(num != 0) {
-        sum += num % 10;
-        num /= 10;
-    }
-    return 9 - (sum % 10);
-}
-
-//依次序输出卡号
-int cardNumberFactory() {
-    int currentCardNum = FIRSTCARDNUMBER + cardSum;
-    cardSum++;
-    int validDigit = getValidDigit(currentCardNum);
-    return currentCardNum * 10 + validDigit;
-}
-
-int getYearFromId(long studentNum) {
-    return studentNum / 1000000;
-}
-
-int getMajorFromId(long studentNum) {
-    return studentNum / 10000 % 100;
-}
-
-int getIndexFromId(long studentNum) {
-    return studentNum / 10 % 1000;
-}
-
 //通过卡号查找对应卡并返回其指针，若查找失败返回NULL
 Card* getCard(int cardNum) {
     Card* p = top;
@@ -174,7 +188,7 @@ Student* getStudent(long studentNum) {
 }
 
 //初始化操作日志
-OpeLog* initOpeLog(int type, long studentNum, int cardNum, int result, int value) {
+OpeLog* initOpeLog(int type, long studentNum, int cardNum, int result, int value, long time) {
     OpeLog* opelog;
     opelog = (OpeLog*)malloc(sizeof(OpeLog));
     if(opelog == NULL) {
@@ -186,14 +200,15 @@ OpeLog* initOpeLog(int type, long studentNum, int cardNum, int result, int value
     opelog->cardNum = cardNum;
     opelog->result = result;
     opelog->value = value;
+    opelog->time = time;
     strcpy(opelog->name, getStudent(studentNum)->name);
     return opelog;
 }
 
 //传入学生信息及日志信息，将日志保存到学生信息中
-int saveOpeLog(Student* stu, int type, int result, int value) {
+int saveOpeLogToStu(Student* stu, int type, int result, int value, long time) {
     if(stu->tail) {
-        stu->tail->next = initOpeLog(type, stu->studentNum, getStudent(stu->studentNum)->rear->cardNum, result, value);
+        stu->tail->next = initOpeLog(type, stu->studentNum, getStudent(stu->studentNum)->rear->cardNum, result, value, time);
         stu->tail = stu->tail->next;
     }
     else {
@@ -239,7 +254,7 @@ int openAccount(char* name, long studentNum) {
     temp = initStu(name, studentNum);
     *target = *temp;
     if(target->head == NULL) {
-        target->head = initOpeLog(OPENACC, studentNum, 0, OK, 0);
+        target->head = initOpeLog(OPENACC, studentNum, 0, OK, 0, 0);
         target->tail = target->head;
     }
     else {
@@ -260,7 +275,7 @@ int openCard(long studentNum) {
             stu->front = card;
             stu->rear = card;
             card->next = NULL;
-            saveOpeLog(stu, OPENCARD, OK, 0);
+            saveOpeLogToStu(stu, OPENCARD, OK, 0, 0);
         }
         else if(stu->rear->status == LOSS){
             stu->rear->status = BANNED;
@@ -269,22 +284,22 @@ int openCard(long studentNum) {
             stu->rear->balance = 0;
             stu->rear = card;
             card->next = NULL;
-            saveOpeLog(stu, OPENCARD, OK, 0);
+            saveOpeLogToStu(stu, OPENCARD, OK, 0, 0);
         }
         else if(stu->rear->status == BANNED) {
             printf("ERROR: 上张卡被禁用，开卡失败！\n");
-            saveOpeLog(stu, OPENCARD, FAILED, 0);
+            saveOpeLogToStu(stu, OPENCARD, FAILED, 0, 0);
             exit(FAILED);
         }
         else { // 上张卡正常使用，未挂失
             printf("卡未挂失，请先挂失后开卡！\n");
-            saveOpeLog(stu, OPENCARD, FAILED, 0);
+            saveOpeLogToStu(stu, OPENCARD, FAILED, 0, 0);
             return FAILED;
         }
     }
     else {
         printf("ERROR: 账户不可用，开卡失败！\n");
-        saveOpeLog(stu, OPENCARD, FAILED, 0);
+        saveOpeLogToStu(stu, OPENCARD, FAILED, 0, 0);
         return FAILED;
     }
 }
@@ -296,33 +311,33 @@ int topupBalance(long studentNum, float topupAmout) {
     if(stu->status == NORMAL) {
         if(stu->rear == NULL) {
             printf("该学生无卡，请先开卡！\n");
-            saveOpeLog(stu, TOPUP, FAILED, topupAmout);
+            saveOpeLogToStu(stu, TOPUP, FAILED, topupAmout, 0);
             return FAILED;
         }
         else if(stu->rear->status == NORMAL) {
             if(temp <= 0) {
-                saveOpeLog(stu, TOPUP, FAILED, topupAmout);
+                saveOpeLogToStu(stu, TOPUP, FAILED, topupAmout, 0);
                 printf("充值金额需大于0, 充值失败！\n");
                 return FAILED;
             }
             if((temp + stu->rear->balance) >= 100000) { //充值后金额大于1000元
-                saveOpeLog(stu, TOPUP, FAILED, topupAmout);
+                saveOpeLogToStu(stu, TOPUP, FAILED, topupAmout, 0);
                 printf("卡内余额需小于1000元， 充值失败！\n");
                 return FAILED;
             }
             stu->rear->balance += temp;
-            saveOpeLog(stu, TOPUP, OK, topupAmout);
+            saveOpeLogToStu(stu, TOPUP, OK, topupAmout, 0);
             printf("充值成功！\n");
             return OK;
         }
         else {
-            saveOpeLog(stu, TOPUP, FAILED, topupAmout);
+            saveOpeLogToStu(stu, TOPUP, FAILED, topupAmout, 0);
             printf("该学生卡已被挂失或禁用，充值失败！\n");
             return FAILED;
         }
     }
     else {
-        saveOpeLog(stu, TOPUP, FAILED, topupAmout);
+        saveOpeLogToStu(stu, TOPUP, FAILED, topupAmout, 0);
         printf("账户被注销或不存在，充值失败！\n");
         return FAILED;
     }
@@ -333,24 +348,24 @@ int reportLoss(long studentNum) {
     Student *stu = getStudent(studentNum);
     if(stu->status == NORMAL) {
         if(stu->rear == NULL) {
-            saveOpeLog(stu, REPOLOSS, FAILED, 0);
+            saveOpeLogToStu(stu, REPOLOSS, FAILED, 0, 0);
             printf("该学生无卡，请先开卡！\n");
             return FAILED;
         }
         else if(stu->rear->status == NORMAL) {
             stu->rear->status = LOSS;
-            saveOpeLog(stu, REPOLOSS, OK, 0);
+            saveOpeLogToStu(stu, REPOLOSS, OK, 0, 0);
             printf("挂失成功！\n");
             return OK;
         }
         else {
-            saveOpeLog(stu, REPOLOSS, FAILED, 0);
+            saveOpeLogToStu(stu, REPOLOSS, FAILED, 0, 0);
             printf("该学生卡已被挂失或禁用，挂失失败！\n");
             return FAILED;
         }
     }
     else {
-        saveOpeLog(stu, REPOLOSS, FAILED, 0);
+        saveOpeLogToStu(stu, REPOLOSS, FAILED, 0, 0);
         printf("ERROR: 账户不可用，挂失失败！\n");
         return FAILED;
     }
@@ -360,25 +375,25 @@ int cancelLoss(long studentNum) {
     Student *stu = getStudent(studentNum);
     if(stu->status == NORMAL) {
         if(stu->rear == NULL) {
-            saveOpeLog(stu, CANCELLOSS, FAILED, 0);
+            saveOpeLogToStu(stu, CANCELLOSS, FAILED, 0, 0);
             printf("该学生无卡，请先开卡！\n");
             return FAILED;
         }
         else if(stu->rear->status == LOSS) {
             stu->rear->status = NORMAL;
-            saveOpeLog(stu, CANCELLOSS, OK, 0);
+            saveOpeLogToStu(stu, CANCELLOSS, OK, 0, 0);
             printf("解挂成功！\n");
             return OK;
         }
         else {
             printf("该学生卡未挂失或已禁用，解挂失败！\n");
-            saveOpeLog(stu, CANCELLOSS, FAILED, 0);
+            saveOpeLogToStu(stu, CANCELLOSS, FAILED, 0, 0);
             return FAILED;
         }
     }
     else {
         printf("ERROR: 账户不可用，解挂失败！\n");
-        saveOpeLog(stu, CANCELLOSS, FAILED, 0);
+        saveOpeLogToStu(stu, CANCELLOSS, FAILED, 0, 0);
         return FAILED;
     }
 }
@@ -387,12 +402,12 @@ int deleteAccount(long studentNum) {
     Student *stu = getStudent(studentNum);
     if(stu->status == NORMAL) {
         stu->status = DELETED;
-        saveOpeLog(stu, DELETEACC, OK, 0);
+        saveOpeLogToStu(stu, DELETEACC, OK, 0, 0);
         printf("账户注销成功！");
     }
     else {
         printf("ERROR: 账户不可用，注销失败！\n");
-        saveOpeLog(stu, DELETEACC, FAILED, 0);
+        saveOpeLogToStu(stu, DELETEACC, FAILED, 0, 0);
         return FAILED;
     }
 }
@@ -407,25 +422,52 @@ int pay(int cardNum, float payAmount) {
             if(card->balance - payInt >= 0) { //卡中余额充足
                 card->balance -= payInt;
                 printf("支付成功！");
-                saveOpeLog(stu, PAY, OK, payAmount);
+                saveOpeLogToStu(stu, PAY, OK, payAmount, 0);
                 return OK;
             }
             else {
                 printf("卡中余额不足，支付失败!\n");
-                saveOpeLog(stu, PAY, FAILED, payAmount);
+                saveOpeLogToStu(stu, PAY, FAILED, payAmount, 0);
                 return FAILED;
             }
         }
         else {
             printf("卡已挂失或禁用，支付失败！\n");
-            saveOpeLog(stu, PAY, FAILED, payAmount);
+            saveOpeLogToStu(stu, PAY, FAILED, payAmount, 0);
             return FAILED;
         }
     }
     else {
         printf("卡号对应学生账户不存在或已注销，支付失败!\n");
-        saveOpeLog(stu, PAY, FAILED, payAmount);
+        saveOpeLogToStu(stu, PAY, FAILED, payAmount, 0);
         return FAILED; 
+    }
+}
+
+//模拟在窗口出消费，输入窗口序号，卡号，支付金额，时间戳
+int payAtWindow(int index, int cardNum, float payAmount, int time) {
+    OpeLog* temp = initOpeLog(PAY, getCard(cardNum)->studentNum, cardNum, OK, payAmount, time);
+    if(pay(cardNum, payAmount) == OK) {
+        if(windows[index - 1].logQuantity < 60000) {
+            if(windows[index - 1].rear) { //该窗口日志不为空
+                temp->next = windows[index - 1].rear->next;
+                windows[index - 1].rear->next = temp;
+                windows[index - 1].rear = temp;
+            }
+            else {
+                windows->rear = temp;
+                temp->next = temp;
+            }
+        }
+        else {
+            temp = windows[index - 1].rear->next->next;
+            windows[index - 1].rear->next = temp;
+            windows[index - 1].rear = temp;
+        }
+        return OK;
+    }
+    else {
+        return FAILED;
     }
 }
 
@@ -469,7 +511,7 @@ int main() {
     openCard(2020010021);
     topupBalance(2020010011, 100);
     topupBalance(2020010011, 10000);
-    initOpeLog(OPENACC, 2020010011, getStudent(2020010011)->rear->cardNum, 1, 0);
+    initOpeLog(OPENACC, 2020010011, getStudent(2020010011)->rear->cardNum, 1, 0, 0);
     importOpenDisInfo();
     return 0;
 }
