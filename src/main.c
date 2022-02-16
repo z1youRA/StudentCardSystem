@@ -13,25 +13,42 @@
 #define STUDENTSNUM 50000 //学生上限
 #define OK 1
 #define FAILED 0
+#define OPENDIS 0
+#define DELETEDIS 1
+#define OPENCARD 2
+#define REPOLOSS 3
+#define CANCELLOSS 4
+#define TOPUP 5
+#define PAY 6
 
-typedef struct card {
+typedef struct {
     long studentNum;
     int cardNum;
     int status;
     int balance;
     int expDate;
     int pwd;
-    struct card* next;
-    struct card* down;
+    struct card* next;  //指向该学生的下一张卡
+    struct card* down;  //指向卡号递增的下一张卡
     //#TODO类似十字链表，在窗口和卡片处均存储log
 } Card;
 
-typedef struct student {
+typedef struct {
+    int type;   //操作类型
+    long studentNum;
+    char name[20];
+    int cardNum;
+    int result; //操作结果
+    int value;  //金额
+} OpeLog;
+
+typedef struct {
     char name[20];
     long studentNum;
     Card* front;
     Card* rear;
     int status;
+    OpeLog* head;
 } Student;
 
 int cardSum = 0;
@@ -154,6 +171,31 @@ Student* getStudent(long studentNum) {
     return &students[getMajorFromId(studentNum)][getIndexFromId(studentNum)];
 }
 
+//初始化操作日志
+OpeLog* initOpeLog(int type, long studentNum, int cardNum, int result, int value) {
+    OpeLog* opelog;
+    opelog = (OpeLog*)malloc(sizeof(OpeLog));
+    if(opelog == NULL) {
+        printf("动态空间申请失败!\n");
+        exit(1);
+    }
+    opelog->type = type;
+    opelog->studentNum = studentNum;
+    opelog->cardNum = cardNum;
+    opelog->result = result;
+    opelog->value = value;
+    strcpy(opelog->name, getStudent(studentNum)->name);
+    return opelog;
+}
+
+//通过学号索引最新一张卡的卡号，若无卡则返回-1;
+int getCardNum(long studentNum) {
+    if(getStudent(studentNum)->rear)
+        return getStudent(studentNum)->rear->cardNum;
+    else
+        return -1;
+}
+
 //手动开户操作
 int openDiscount(char* name, long studentNum) {
     // char name[20];
@@ -182,6 +224,7 @@ int openDiscount(char* name, long studentNum) {
     // }
     temp = initStu(name, studentNum);
     *target = *temp;
+    target->head = initOpeLog(OPENDIS, studentNum, 0, OK, 0);
     free(temp);
     return OK;
 }
@@ -252,6 +295,7 @@ int topupBalance(long studentNum, float topupAmout) {
     }
 }
 
+//挂失
 int reportLoss(long studentNum) {
     Student *stu = getStudent(studentNum);
     if(stu->status == NORMAL) {
@@ -338,6 +382,7 @@ int pay(int cardNum, float payAmount) {
     }
 }
 
+//从文件中读入信息，进行批量开户操作
 int importOpenDisInfo() {
     FILE* file = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/kh001.txt", "r"); //#TODO change to relative path
     char* num = NULL;
@@ -365,7 +410,7 @@ int importOpenDisInfo() {
         }
     }
     fclose(file);
-}
+} 
 
 int main() {
     // int abc = cardNumberFactory();
@@ -377,6 +422,7 @@ int main() {
     openCard(2020010021);
     topupBalance(2020010011, 100);
     topupBalance(2020010011, 10000);
+    initOpeLog(OPENDIS, 2020010011, getStudent(2020010011)->rear->cardNum, 1, 0);
     importOpenDisInfo();
     return 0;
 }
