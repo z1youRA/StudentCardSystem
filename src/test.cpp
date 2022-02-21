@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unordered_map>
 #include <iostream>
+#include <vector>
 
 #define DELETED 0 //销户
 #define NORMAL 1
@@ -73,6 +74,8 @@ typedef struct window
 
 unordered_map<long, Student*> students;
 unordered_map<int, Card*> cards;
+vector<OpeLog*> windowRec[100];
+vector<OpeLog*> opeRec;
 int cardSum = 0;
 int studentSum = 0;
 // Student students[MAJORNUM][STUDENTPERMAJOR]; //#TODO数组可直接存放指向Student的指针，以减小数组大小
@@ -253,6 +256,10 @@ OpeLog *initOpeLog(int type, long studentNum, int cardNum, int result, int value
     opelog->result = result;
     opelog->value = value;
     opelog->time = time;
+    if(studentNum == -1) {   //若学号为-1，说明为占位所用
+        strcpy(opelog->name, "EMPTY");
+        return opelog;
+    }
     strcpy(opelog->name, getStudent(studentNum)->name);
     return opelog;
 }
@@ -543,14 +550,14 @@ int pay(int cardNum, float payAmount)
 
 //初始化窗口日志，使日志从指定位置开始存储
 int initWindow(int index, int position) {
-    OpeLog* log = initOpeLog(EMPTY, 0, 0, OK, 0, TIMENOW);
+    OpeLog* log = initOpeLog(EMPTY, -1, 0, OK, 0, TIMENOW);
      if(windows[index].rear == NULL) { // 窗口日志为空， 生成一个初始日志
         windows[index].rear = log;
         log->next = log;
         windows[index].logQuantity++;
     }
     for(int i = 0; i < position - 2; i++) { // 生成position - 2个占位日志
-        OpeLog* log = initOpeLog(EMPTY, 0, 0, OK, 0, TIMENOW);
+        OpeLog* log = initOpeLog(EMPTY, -1, 0, OK, 0, TIMENOW);
         log->next = windows[index].rear->next;
         windows[index].rear->next = log;
         windows[index].rear = log;
@@ -609,7 +616,7 @@ int importOpenDisInfo()
     char str[30];
     if (fgets(str, 30, file))
     {
-        if (strcmp(str, "KH"))
+        if (!strncmp(str, "KH", 2))
         { //检测验证文件正确性
             while (fgets(str, 30, file))
             { //逐行读入信息
@@ -643,10 +650,10 @@ int importPositionInfo() {
         exit(1);
     }
     if(fgets(str, 10, file)) {
-        if(strcmp(str, "WZ")) {
-            while(fgets(str, 10, file)) {
+        if(!strncmp(str, "WZ", 2)) { //#TODO strcmp返回1
+            while(fgets(str, 30, file)) {
                 index = strtok(str, ",");
-                position = strtok(str, ";");
+                position = strtok(NULL, ";");
                 i = atoi(index);
                 p = atoi(position);
                 initWindow(i, p);
@@ -658,6 +665,93 @@ int importPositionInfo() {
         }
     }
     return OK;
+}
+
+int importOpeInfo() {
+    FILE* opeFile = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/cz002.txt", "r");
+    // FILE* payFile = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/xf014.txt");
+    char opeStr[50];
+    char* ope = NULL;
+    char *ptr;
+    long stuNum;
+    int type;
+    long time;
+    
+    if (opeFile == NULL)
+    {
+        printf("ERROR: 文件路径有误！");
+        exit(1);
+    }
+    
+    if(fgets(opeStr, 50, opeFile)) {
+        if(!strncmp(opeStr, "CZ", 2)) {
+            while(fgets(opeStr, 50, opeFile)) {
+                time = strtol(strtok(opeStr, ","), &ptr, 10); //时间戳转为long存储
+                ope = strtok(NULL, ",");
+                if(!strcmp(ope, "挂失")) 
+                    type = REPOLOSS;
+                else if(!strcmp(ope, "解挂"))
+                    type = CANCELLOSS;
+                else if(!strcmp(ope, "销户"))
+                    type = DELETEACC;
+                else if(!strcmp(ope, "充值"))
+                    type = PAY;
+                else if(!strcmp(ope, "补卡"))
+                    type = OPENCARD;
+                else
+                    printf("ERROR: 数据读取有误!\n");
+                stuNum = atoi(strtok(NULL, ";"));
+                OpeLog* log = initOpeLog(type, stuNum, 0, OK, 0, time);
+                opeRec.push_back(log);
+            }
+        }
+    }
+    else {
+        return FAILED;
+    }
+}
+
+int importPayInfo() {
+    FILE* payFile = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/xf014.txt", "r");
+    char payStr[50];
+    OpeLog* log = NULL;
+    char *ptr, *p;
+    int cardNum;
+    char* time1;
+    char* time2;
+    int windowIndex;
+    long time;
+    int value;
+    if (payFile == NULL)
+    {
+        printf("ERROR: 文件路径有误！");
+        exit(1);
+    }
+    
+    if(fgets(payStr, 50, payFile)) {
+        if(!strncmp(payStr, "XF", 2)) {
+            while(fgets(payStr, 50, payFile)) {
+                if(payStr[0] == 'W') {
+                    int i = 0;
+                    while(payStr[i] != '\0') {
+                        payStr[i] = payStr[i + 1];
+                        i++;
+                    }
+                    windowIndex = strtol(payStr, &ptr, 10);
+                }
+                // cardNum = atoi(strtok(payStr, ","));
+                // time1 = strtok(NULL, ",");
+                // time2 = strtok(NULL, ",");
+                // strcat(time1, time2);
+                // time = strtol(time1, &ptr, 10);
+                // value = balanceToInt(stof(strtok(NULL, ";")));
+                // log = initOpeLog(PAY, 0, cardNum, OK, value, time);
+            }
+        }
+    }
+    else {
+        return FAILED;
+    }
 }
 
 int main() {
@@ -673,6 +767,8 @@ int main() {
     payAtWindow(1, getStudent(2020010011)->rear->cardNum, 20, 0);
     initOpeLog(OPENACC, 2020010011, getStudent(2020010011)->rear->cardNum, 1, 0, 0);
     importOpenDisInfo();
-    // importPositionInfo();
+    importPositionInfo();
+    importOpeInfo();
+    importPayInfo();
     return 0;
 }
