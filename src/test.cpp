@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <vector>
+#include <queue>
 
 #define DELETED 0 //销户
 #define NORMAL 1
@@ -75,7 +76,6 @@ typedef struct window
 unordered_map<long, Student*> students;
 unordered_map<int, Card*> cards;
 vector<OpeLog*> windowRec[100];
-vector<OpeLog*> opeRec;
 int cardSum = 0;
 int studentSum = 0;
 // Student students[MAJORNUM][STUDENTPERMAJOR]; //#TODO数组可直接存放指向Student的指针，以减小数组大小
@@ -701,8 +701,8 @@ int importOpeInfo() {
                 else
                     printf("ERROR: 数据读取有误!\n");
                 stuNum = atoi(strtok(NULL, ";"));
-                OpeLog* log = initOpeLog(type, stuNum, 0, OK, 0, time);
-                opeRec.push_back(log);
+                OpeLog* log = initOpeLog(type, stuNum, 0, 0, 0, time);
+                windowRec[0].push_back(log);
             }
         }
     }
@@ -739,19 +739,60 @@ int importPayInfo() {
                     }
                     windowIndex = strtol(payStr, &ptr, 10);
                 }
-                // cardNum = atoi(strtok(payStr, ","));
-                // time1 = strtok(NULL, ",");
-                // time2 = strtok(NULL, ",");
-                // strcat(time1, time2);
-                // time = strtol(time1, &ptr, 10);
-                // value = balanceToInt(stof(strtok(NULL, ";")));
-                // log = initOpeLog(PAY, 0, cardNum, OK, value, time);
+                else {
+                    cardNum = atoi(strtok(payStr, ","));
+                    time1 = strtok(NULL, ",");
+                    time2 = strtok(NULL, ",");
+                    strcat(time1, time2);
+                    time = strtol(time1, &ptr, 10);
+                    value = balanceToInt(stof(strtok(NULL, ";")));
+                    log = initOpeLog(PAY, -1, cardNum, windowIndex, value, time); //result存储windowIndex便于调用pay函数
+                    windowRec[windowIndex].push_back(log);
+                }
             }
         }
     }
     else {
         return FAILED;
     }
+    return OK;
+}
+
+struct comp
+{
+    bool operator()(const struct opelog *a, const struct opelog *b) {
+        // printf("%ld, %ld\n", a->time, b->time);
+        return a->time < b->time;
+}
+};
+
+
+std::vector<OpeLog*> mergesort(vector<OpeLog*> *array){
+    clock_t start = clock();
+    vector<OpeLog*> result;
+    priority_queue<OpeLog*, std::vector<OpeLog*>, comp> pq;
+    for(int i = 0; i < 100; i++){
+        if(array[i].size() > 0){
+            pq.push(array[i][0]);
+        }
+    }
+    int count = 0;
+    while(!pq.empty()){
+        OpeLog* tmp = pq.top();
+        pq.pop();
+        result.push_back(tmp);
+        array[tmp->result].erase(array[tmp->result].begin());
+        if(array[tmp->result].size() > 0) {
+            pq.push(array[tmp->result][0]);
+        }
+        count++;
+        if (count % 10000 ==0) {
+            std::cout << count << std::endl;
+        }
+    }
+    std::cout<<"merge_k time: "<<(clock() - start)/(double)CLOCKS_PER_SEC<<"s"<<std::endl;
+    cout << result.size();
+    return result;
 }
 
 int main() {
@@ -770,5 +811,6 @@ int main() {
     importPositionInfo();
     importOpeInfo();
     importPayInfo();
+    mergesort(windowRec);
     return 0;
 }
