@@ -76,7 +76,6 @@ typedef struct window
 struct comp
 {
     bool operator()(const struct opelog *a, const struct opelog *b) {
-        // printf("%ld, %ld\n", a->time, b->time);
         return a->time > b->time;
     }
 };
@@ -86,8 +85,6 @@ unordered_map<int, Card*> cards;
 vector<OpeLog*> windowRec[100];
 int cardSum = 0;
 int studentSum = 0;
-// Student students[MAJORNUM][STUDENTPERMAJOR]; //#TODO数组可直接存放指向Student的指针，以减小数组大小
-// Card *top = NULL;                            //卡链表
 int studentsPerMajor[MAJORNUM];
 Window windows[100];
 //所有学生状态初始化为不存在
@@ -210,15 +207,6 @@ Student *getStudent(long studentNum)
     }
     pair<long, Student*> pr = *iter;
     return pr.second;
-    // if (getMajorFromId(studentNum) < 0 || getMajorFromId(studentNum) >= MAJORNUM || getIndexFromId(studentNum) < 0 || getIndexFromId(studentNum) >= STUDENTPERMAJOR)
-    // {
-    //     printf("ERROR: 学号超出范围！\n");
-    //     exit(FAILED);
-    // }
-    // if(students[getMajorFromId(studentNum)][getIndexFromId(studentNum)].status == NONEXIST) {
-    //     printf("ERROR: 学生不存在！\n");
-    //     exit(FAILED);
-    // }
 }
 
 //初始化操作日志
@@ -266,30 +254,10 @@ int saveOpeLogToStu(Student *stu, int type, int result, int value, long time)
     }
 }
 
-// //通过学号索引最新一张卡的卡号，若无卡则返回-1;
-// int getCardNum(long studentNum)
-// {
-//     if (getStudent(studentNum)->rear)
-//         return getStudent(studentNum)->rear->cardNum;
-//     else
-//         return -1;
-// }
-
 //手动开户操作
 int openAccount(char *name, long studentNum)
 {
-    // char name[20];
-    // long studentNum;
     Student *temp;
-
-    /*
-    #TODO 测试用，暂停键盘输入，改为直接读入数据
-    printf("Input name: ");
-    scanf("%s", name);
-    printf("\nInput student ID: ");
-    scanf("%ld", &studentNum);
-    */
-
     Student *target = getStudent(studentNum); //学生在学生数组中的位置指针
     //#TODO 检查输入学号年份和专业是否存在
     if (target != NULL)
@@ -297,12 +265,6 @@ int openAccount(char *name, long studentNum)
         printf("ERROR: 该学号已开户！\n");
         exit(1);
     }
-    // for(int i = 0; students[getMajorFromId(studentNum)][i].status != NONEXIST && i < STUDENTPERMAJOR; i++) {
-    //         if(students[getMajorFromId(studentNum)][i].studentNum == studentNum) {
-    //         printf("学号已存在！");
-    //         return FAILED;
-    //     }
-    // }
     temp = initStu(name, studentNum);
     // *target = *temp;
     students[studentNum] = temp;    //将生成的学生指针存入unordered_map
@@ -513,7 +475,7 @@ int pay(int cardNum, float payAmount)
             if (card->balance - payInt >= 0)
             { //卡中余额充足
                 card->balance -= payInt;
-                printf("支付成功！");
+                printf("支付成功！\n");
                 saveOpeLogToStu(stu, PAY, OK, payAmount, 0);
                 return OK;
             }
@@ -647,7 +609,7 @@ int importPositionInfo() {
         exit(1);
     }
     if(fgets(str, 10, file)) {
-        if(!strncmp(str, "WZ", 2)) { //#TODO strcmp返回1
+        if(!strncmp(str, "WZ", 2)) {
             while(fgets(str, 30, file)) {
                 index = strtok(str, ",");
                 position = strtok(NULL, ";");
@@ -666,7 +628,6 @@ int importPositionInfo() {
 
 int importOpeInfo() {
     FILE* opeFile = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/cz002.txt", "r");
-    // FILE* payFile = fopen("/home/z1youra/repos/C/StudentCardSystem/testFile/xf014.txt");
     char opeStr[50];
     char* ope = NULL;
     char *ptr;
@@ -698,11 +659,11 @@ int importOpeInfo() {
                     stuNum = strtol((strtok(NULL, ",")), &ptr, 10);
                     value = balanceToInt(strtof(strtok(NULL, ";"), NULL));  //将读入的str转为float再转为int存储
                     Student* stu = getStudent(stuNum);
-                    if(stu = NULL) {
+                    if(stu == NULL) {
                         printf("ERROR: 学生未开户，请先进行开户后充值\n");
                         return FAILED;
                     }
-                    if(stu->rear = NULL) {
+                    if(stu->rear == NULL) {
                         printf("ERROR: 学生未开卡，请先开卡后充值\n");
                         return FAILED;
                     }
@@ -781,12 +742,6 @@ std::vector<OpeLog*> mergesort(vector<OpeLog*> *array){
         }
     }
     int count = 0;
-    // for(int i=0;i<=pq.size();i++){
-    //     OpeLog *tmp = pq.top();
-    //     pq.pop();
-    //     std::cout<<tmp->time<<std::endl;
-    // }
-    // exit(0);
     while(!pq.empty()){
         OpeLog* tmp = pq.top();
         pq.pop();
